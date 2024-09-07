@@ -2,13 +2,12 @@ import TelegramBot from 'node-telegram-bot-api';
 
 require('dotenv').config();
 
-
 const token = process.env.TG_TOKEN;
 const adminId = process.env.ADMIN_ID;
 
 if (!token || !adminId) {
-	console.error('Bot token or admin ID not found in environment variables');
-	process.exit(1);
+    console.error('Bot token or admin ID not found in environment variables');
+    process.exit(1);
 }
 
 const bot = new TelegramBot(token, { polling: true });
@@ -18,172 +17,211 @@ const whitelist = new Set<number>();
 const pendingRequests = new Map<number, string>(); // Store user ID and username
 
 // Helper function to send messages
-const sendMessage = (chatId: number, text: string, options?: TelegramBot.SendMessageOptions) => {
-	bot.sendMessage(chatId, text, { parse_mode: 'Markdown', ...options });
+const sendMessage = async (chatId: number, text: string, options?: TelegramBot.SendMessageOptions) => {
+    console.log('Attempting to send message:', chatId, text, options);
+    try {
+        const sentMessage = await bot.sendMessage(chatId, text, { parse_mode: 'Markdown', ...options });
+        console.log('Message sent successfully:', sentMessage);
+        return sentMessage;
+    } catch (error: any) {
+        console.error('Error sending message with Markdown:', error);
+        // If the error is related to parsing entities, try sending without Markdown
+        if (error.message.includes("can't parse entities")) {
+            try {
+                const sentMessage = await bot.sendMessage(chatId, text, { ...options, parse_mode: undefined });
+                console.log('Message sent successfully without Markdown:', sentMessage);
+                return sentMessage;
+            } catch (retryError) {
+                console.error('Error sending message without Markdown:', retryError);
+                return null;
+            }
+        }
+        return null;
+    }
 };
+
 
 // Check if user is whitelisted
 const isWhitelisted = (userId: number) => whitelist.has(userId);
-//const isWhitelisted = (userId: number) => true;
 
 // Middleware to check whitelist
-const checkWhitelist = (msg: TelegramBot.Message, action: () => void) => {
-	const userId = msg.from?.id;
-	if (userId && isWhitelisted(userId)) {
-		action();
-	} else {
-		sendMessage(msg.chat.id, "You don't have permission to use this bot. Please request access using /request_access.");
-	}
+const checkWhitelist = async (msg: TelegramBot.Message, action: () => void) => {
+    const userId = msg.from!.id;
+    if (isWhitelisted(userId)) {
+        action();
+    } else {
+        if (pendingRequests.has(userId)) {
+            console.log('check -> pending');
+            await sendMessage(msg.chat.id, "Your access request is pending approval.");
+        } else {
+            console.log('check -> ce mec est un random');
+            const sentMessage = await sendMessage(Number(userId), "You don't have permission to use this bot. Please request access using /request_access.");
+            if (!sentMessage) {
+                console.log('Failed to send message to user. They may have blocked the bot or never started a chat with it.');
+                // Optionally, notify the admin about this issue
+                await sendMessage(Number(adminId), `Failed to send message to user ${userId}. They may have blocked the bot or never started a chat with it.`);
+            }
+        }
+    }
 };
 
+// Handle all incoming messages
+bot.on('message', async (msg) => {
+    const userId = msg.from!.id;
+    const text = msg.text || '';
+    console.log('message', msg);
+
+    if (text.startsWith('/')) {
+        // Handle commands
+        const command = text.split(' ')[0];
+        switch (command) {
+            case '/request_access':
+                handleRequestAccess(msg);
+                break;
+            case '/help':
+                helpMessage(msg.chat.id);
+                break;
+            case '/start':
+                startMessage(msg.chat.id);
+                break;
+            case '/list':
+                checkWhitelist(msg, () => list(msg));
+                break;
+            case '/track':
+                checkWhitelist(msg, () => track(msg));
+                break;
+            case '/untrack':
+                checkWhitelist(msg, () => untrack(msg));
+                break;
+            case '/bulk_import':
+                checkWhitelist(msg, () => bulkImport(msg));
+                break;
+            case '/stop':
+                checkWhitelist(msg, () => stopMessage(msg.chat.id));
+                break;
+            case '/status':
+                checkWhitelist(msg, () => statusMessage(msg.chat.id));
+                break;
+            default:
+                checkWhitelist(msg, () => defaultMessage(msg.chat.id));
+                break;
+        }
+    } else {
+        // Handle non-command messages
+        checkWhitelist(msg, () => {
+            // Process whitelisted user's message here
+            console.log('Processing message from whitelisted user:', text);
+        });
+    }
+});
+
 // Command handlers
-bot.onText(/\/start/, (msg) => {
-	sendMessage(msg.chat.id, "Welcome to the bot! Use /request_access to request access.");
-});
+const handleRequestAccess = (msg: TelegramBot.Message) => {
+    const userId = msg.from!.id;
+    const username = msg.from!.username || 'Unknown';
+    if (isWhitelisted(userId)) {
+        sendMessage(msg.chat.id, "You already have access to this bot.");
+    } else if (pendingRequests.has(userId)) {
+        sendMessage(msg.chat.id, "Your access request is pending approval.");
+    } else {
+        pendingRequests.set(userId, username);
+        sendMessage(msg.chat.id, "Your access request has been submitted. Please wait for approval.");
 
-
-// New command for requesting access
-bot.onText(/\/request_access/, (msg) => {
-	const userId = msg.from?.id;
-	const username = msg.from?.username || 'Unknown';
-	if (userId) {
-		if (isWhitelisted(userId)) {
-			sendMessage(msg.chat.id, "You already have access to this bot.");
-		} else if (pendingRequests.has(userId)) {
-			sendMessage(msg.chat.id, "Your access request is pending approval.");
-		} else {
-			pendingRequests.set(userId, username);
-			sendMessage(msg.chat.id, "Your access request has been submitted. Please wait for approval.");
-
-			// Send request to admin with inline keyboard
-			const inlineKeyboard = {
-				inline_keyboard: [
-					[
-						{ text: 'Accept', callback_data: `accept_${userId}` },
-						{ text: 'Deny', callback_data: `deny_${userId}` }
-					]
-				]
-			};
-			sendMessage(Number(adminId), `User @${username} (ID: ${userId}) requests to join the chat.`, { reply_markup: inlineKeyboard });
-		}
-	}
-});
+        // Send request to admin with inline keyboard
+        const inlineKeyboard = {
+            inline_keyboard: [
+                [
+                    { text: 'Accept', callback_data: `accept_${userId}` },
+                    { text: 'Deny', callback_data: `deny_${userId}` }
+                ]
+            ]
+        };
+        sendMessage(Number(adminId), `User @${username} (ID: ${userId}) requests to join the chat.`, { reply_markup: inlineKeyboard });
+    }
+};
 
 // Handle callback queries (button clicks)
 bot.on('callback_query', async (callbackQuery) => {
-	const action = callbackQuery.data?.split('_')[0];
-	const userId = Number(callbackQuery.data?.split('_')[1]);
-	const adminChatId = callbackQuery.message?.chat.id;
+    const action = callbackQuery.data?.split('_')[0];
+    const userId = Number(callbackQuery.data?.split('_')[1]);
+    const adminChatId = callbackQuery.message?.chat.id;
 
-	if (adminChatId !== Number(adminId)) return;
+    if (adminChatId !== Number(adminId)) return;
 
-	if (action === 'accept') {
-		whitelist.add(userId);
-		pendingRequests.delete(userId);
-		await bot.answerCallbackQuery(callbackQuery.id, { text: 'User approved' });
-		sendMessage(Number(adminId), `User ${userId} has been approved.`);
-		sendMessage(userId, "Your access request has been approved. You can now use the bot.");
-	} else if (action === 'deny') {
-		pendingRequests.delete(userId);
-		await bot.answerCallbackQuery(callbackQuery.id, { text: 'User denied' });
-		sendMessage(Number(adminId), `User ${userId} has been denied access.`);
-		sendMessage(userId, "Your access request has been denied.");
-	}
-
-	// Remove the inline keyboard after action
-	await bot.editMessageReplyMarkup({ inline_keyboard: [] }, {
-		chat_id: adminChatId,
-		message_id: callbackQuery.message?.message_id
-	});
-});
-
-
-////////////////////
-// command handlers
-////////////////////
-
-
-bot.onText('message', (msg) => {
-  const command = msg.text?.split(' ')[0];
-  
-  checkWhitelist(msg, () => {
-    switch (command) {
-      case '/help':
-        helpMessage(msg.chat.id);
-        break;
-      case '/start':
-        startMessage(msg.chat.id);
-        break;
-      case '/list':
-        list(msg);
-        break;
-      case '/track':
-        track(msg);
-        break;
-      case '/untrack':
-        untrack(msg);
-        break;
-      case '/bulk_import':
-        bulkImport(msg);
-        break;
-      case '/stop':
-        stopMessage(msg.chat.id);
-        break;
-      case '/status':
-        statusMessage(msg.chat.id);
-        break;
-      default:
-        defaultMessage(msg.chat.id);
-        break;
+    if (action === 'accept') {
+        whitelist.add(userId);
+        pendingRequests.delete(userId);
+        await bot.answerCallbackQuery(callbackQuery.id, { text: 'User approved' });
+        sendMessage(Number(adminId), `User ${userId} has been approved.`);
+        sendMessage(userId, "Your access request has been approved. You can now use the bot.");
+    } else if (action === 'deny') {
+        pendingRequests.delete(userId);
+        await bot.answerCallbackQuery(callbackQuery.id, { text: 'User denied' });
+        sendMessage(Number(adminId), `User ${userId} has been denied access.`);
+        sendMessage(userId, "Your access request has been denied.");
     }
-  });
+
+    // Remove the inline keyboard after action
+    await bot.editMessageReplyMarkup({ inline_keyboard: [] }, {
+        chat_id: adminChatId,
+        message_id: callbackQuery.message?.message_id
+    });
 });
 
 let helpMessage = (chatId: number) => {
-	sendMessage(chatId, `
-		/help - Show this message
-		/start - Start the bot
-		/request_access - Request access to the bot
-		/list - List all tracked users
-		/track - Track a user
-		/untrack - Untrack a user
-		/bulk_import - Bulk import users
-		/stop - Stop the bot
-		/status - Check the status of the bot
-	`);
+    sendMessage(chatId, `
+Here are the available commands:
+
+--setup--
+🚀 */start* - Start the bot
+🔑 */request_access* - Request access to the bot
+
+--help--
+📚 */help* - Show this message
+
+--management--
+📋 */list* - List all tracked users
+👀 */track* - Track a user
+🚫 */untrack* - Untrack a user
+📥 */bulk_import* - Bulk import users
+🛑 */stop* - Stop the bot
+📊 */status* - Check the status of the bot
+
+Feel free to use these commands to interact with the bot. If you need any further assistance, envoyez moi un dm mes backers Altitude ☁️🩵
+    `);
 };
 
+
 let startMessage = (chatId: number) => {
-	sendMessage(chatId, "you are already whitelisted, check /help for more commands");
+    sendMessage(chatId, "Welcome to the bot! Use /help to see available commands.");
 };
 
 let stopMessage = (chatId: number) => {
-	sendMessage(chatId, "todo");
+    sendMessage(chatId, "Stopping the bot is not implemented yet.");
 };
 
 let statusMessage = (chatId: number) => {
-	sendMessage(chatId, "todo");
+    sendMessage(chatId, "Bot status check is not implemented yet.");
 };
 
 let defaultMessage = (chatId: number) => {
-	sendMessage(chatId, "unknown command, check /help for more commands");
+    sendMessage(chatId, "Unknown command. Use /help to see available commands.");
 };
 
 let list = (msg: TelegramBot.Message) => {
-	sendMessage(msg.chat.id, "todo");
+    sendMessage(msg.chat.id, "Listing tracked users is not implemented yet.");
 };
 
 let track = (msg: TelegramBot.Message) => {
-	sendMessage(msg.chat.id, "todo");
+    sendMessage(msg.chat.id, "Tracking a user is not implemented yet.");
 };
 
 let untrack = (msg: TelegramBot.Message) => {
-	sendMessage(msg.chat.id, "todo");
+    sendMessage(msg.chat.id, "Untracking a user is not implemented yet.");
 };
 
 let bulkImport = (msg: TelegramBot.Message) => {
-	sendMessage(msg.chat.id, "todo");
+    sendMessage(msg.chat.id, "Bulk importing users is not implemented yet.");
 };
-
 
 console.log('Bot is running...');
