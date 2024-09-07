@@ -202,37 +202,37 @@ let startMessage = (msg: TelegramBot.Message) => {
 		return;
 	}
 	else {
-		sendMessage(msg.chat.id, "Welcome to the bot! Use /request_access to use the bot and check /help to see available commands.");
+		sendMessage(msg.chat.id, "Welcome to Altitude Wallet Tracker Bot! Use /request_access to use the bot and check /help to see available commands.");
 	}
 };
 
 
-	let stopMessage = (chatId: number) => {
-		sendMessage(chatId, "Stopping the bot is not implemented yet.");
-	};
+let stopMessage = (chatId: number) => {
+	sendMessage(chatId, "Stopping the bot is not implemented yet.");
+};
 
-	let statusMessage = (chatId: number) => {
-		sendMessage(chatId, "Bot status check is not implemented yet.");
-	};
+let statusMessage = (chatId: number) => {
+	sendMessage(chatId, "Bot status check is not implemented yet.");
+};
 
-	let defaultMessage = (chatId: number) => {
-		sendMessage(chatId, "Unknown command. Use /help to see available commands.");
-	};
+let defaultMessage = (chatId: number) => {
+	sendMessage(chatId, "Unknown command. Use /help to see available commands.");
+};
 
-	let list = (msg: TelegramBot.Message) => {
-		sendMessage(msg.chat.id, "Listing tracked users is not implemented yet.");
-	};
+let list = (msg: TelegramBot.Message) => {
+	sendMessage(msg.chat.id, "Listing tracked users is not implemented yet.");
+};
 
-	let track = (msg: TelegramBot.Message) => {
-		sendMessage(msg.chat.id, "Tracking a user is not implemented yet.");
-	};
+let track = (msg: TelegramBot.Message) => {
+	sendMessage(msg.chat.id, "Tracking a user is not implemented yet.");
+};
 
-	let untrack = (msg: TelegramBot.Message) => {
-		sendMessage(msg.chat.id, "Untracking a user is not implemented yet.");
-	};
+let untrack = (msg: TelegramBot.Message) => {
+	sendMessage(msg.chat.id, "Untracking a user is not implemented yet.");
+};
 
-	let bulkImport = (msg: TelegramBot.Message) => {
-		sendMessage(msg.chat.id, "Bulk importing users is not implemented yet.");
-	};
+let bulkImport = (msg: TelegramBot.Message) => {
+	sendMessage(msg.chat.id, "Bulk importing users is not implemented yet.");
+};
 
-	console.log('Bot is running...');
+console.log('Bot is running...');
