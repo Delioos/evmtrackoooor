@@ -88,6 +88,12 @@ async fn get_all_users(data: web::Data<AppState>) -> impl Responder {
 
 async fn add_wallet_to_watchlist(data: web::Data<AppState>, id: web::Path<i32>, wallet: web::Json<String>) -> impl Responder {
     println!("{}", format!("POST /users/{}/watchlist", id).green()); // Log addition to watchlist
+    // Check data integrity using a regex
+    /*
+    // extraire une fonction is valid 
+    if !wallet.match(r"^0x[a-fA-F0-9]{40}$").is_none() {
+        return HttpResponse::BadRequest().body("Invalid wallet address");
+    }*/
     let mut users = data.users.lock().unwrap();
     match users.get_mut(&id) {
         Some(user) => {
@@ -98,7 +104,8 @@ async fn add_wallet_to_watchlist(data: web::Data<AppState>, id: web::Path<i32>, 
                 HttpResponse::BadRequest().body("Wallet already in watchlist")
             }
         },
-        None => HttpResponse::NotFound().finish(),
+        // log user not found
+        None => HttpResponse::NotFound().finish()
     }
 }
 
