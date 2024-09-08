@@ -2,6 +2,7 @@ use actix_web::{web, App, HttpServer, HttpResponse, Responder};
 use serde::{Serialize, Deserialize};
 use std::sync::Mutex;
 use std::collections::HashMap;
+use colored::Colorize;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct User {
@@ -14,28 +15,30 @@ struct User {
 
 struct AppState {
     users: Mutex<HashMap<i32, User>>,
-    next_id: Mutex<i32>,
 }
 
+// TODO: Securise the api by using a token and a middleware
+
 async fn create_user(data: web::Data<AppState>, user: web::Json<User>) -> impl Responder {
+    println!("{}", "POST /users".green()); // Log creation
     let mut users = data.users.lock().unwrap();
-    let mut next_id = data.next_id.lock().unwrap();
 
     let new_user = User {
-        id: *next_id,
+        id: user.id,
         username: user.username.clone(),
         watchlist: Vec::new(),
         altitude: user.altitude,
         active: user.active,
     };
 
-    users.insert(*next_id, new_user.clone());
-    *next_id += 1;
+    users.insert( user.id, new_user.clone());
 
+    println!("{}", format!("User {} created", user.id).on_green());
     HttpResponse::Created().json(new_user)
 }
 
 async fn get_user(data: web::Data<AppState>, id: web::Path<i32>) -> impl Responder {
+    println!("{}", format!("GET /users/{}", id).blue()); // Log retrieval
     let users = data.users.lock().unwrap();
     match users.get(&id) {
         Some(user) => HttpResponse::Ok().json(user),
@@ -43,7 +46,17 @@ async fn get_user(data: web::Data<AppState>, id: web::Path<i32>) -> impl Respond
     }
 }
 
+async fn get_watchlist(data: web::Data<AppState>, id: web::Path<i32>) -> impl Responder {
+    println!("{}", format!("GET /users/{}/watchlist", id).blue()); // Log retrieval of watchlist
+    let users = data.users.lock().unwrap();
+    match users.get(&id) {
+        Some(user) => HttpResponse::Ok().json(user.watchlist.clone()),
+        None => HttpResponse::NotFound().finish(),
+    }
+}
+
 async fn update_user(data: web::Data<AppState>, id: web::Path<i32>, user: web::Json<User>) -> impl Responder {
+    println!("{}", format!("PUT /users/{}", id).yellow()); // Log update
     let mut users = data.users.lock().unwrap();
     match users.get_mut(&id) {
         Some(existing_user) => {
@@ -57,6 +70,7 @@ async fn update_user(data: web::Data<AppState>, id: web::Path<i32>, user: web::J
 }
 
 async fn delete_user(data: web::Data<AppState>, id: web::Path<i32>) -> impl Responder {
+    println!("{}", format!("DELETE /users/{}", id).red()); // Log deletion
     let mut users = data.users.lock().unwrap();
     if users.remove(&id).is_some() {
         HttpResponse::NoContent().finish()
@@ -66,12 +80,14 @@ async fn delete_user(data: web::Data<AppState>, id: web::Path<i32>) -> impl Resp
 }
 
 async fn get_all_users(data: web::Data<AppState>) -> impl Responder {
+    println!("{}", "GET /users".blue()); // Log retrieval of all users
     let users = data.users.lock().unwrap();
     let users_vec: Vec<User> = users.values().cloned().collect();
     HttpResponse::Ok().json(users_vec)
 }
 
 async fn add_wallet_to_watchlist(data: web::Data<AppState>, id: web::Path<i32>, wallet: web::Json<String>) -> impl Responder {
+    println!("{}", format!("POST /users/{}/watchlist", id).green()); // Log addition to watchlist
     let mut users = data.users.lock().unwrap();
     match users.get_mut(&id) {
         Some(user) => {
@@ -87,6 +103,7 @@ async fn add_wallet_to_watchlist(data: web::Data<AppState>, id: web::Path<i32>, 
 }
 
 async fn remove_wallet_from_watchlist(data: web::Data<AppState>, id: web::Path<i32>, wallet: web::Json<String>) -> impl Responder {
+    println!("{}", format!("DELETE /users/{}/watchlist", id).red()); // Log removal from watchlist
     let mut users = data.users.lock().unwrap();
     match users.get_mut(&id) {
         Some(user) => {
@@ -106,8 +123,9 @@ async fn remove_wallet_from_watchlist(data: web::Data<AppState>, id: web::Path<i
 async fn main() -> std::io::Result<()> {
     let app_state = web::Data::new(AppState {
         users: Mutex::new(HashMap::new()),
-        next_id: Mutex::new(0),
     });
+
+    println!("{}", "Server starting at http://127.0.0.1:8080".cyan());
 
     HttpServer::new(move || {
         App::new()
@@ -118,6 +136,7 @@ async fn main() -> std::io::Result<()> {
             .route("/users/{id}", web::put().to(update_user))
             .route("/users/{id}", web::delete().to(delete_user))
             .route("/users/{id}/watchlist", web::post().to(add_wallet_to_watchlist))
+            .route("/users/{id}/watchlist", web::get().to(get_watchlist))
             .route("/users/{id}/watchlist", web::delete().to(remove_wallet_from_watchlist))
     })
     .bind("127.0.0.1:8080")?
