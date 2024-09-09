@@ -3,10 +3,10 @@ import { sendMessage } from '../bot';
 import { WhitelistMiddleware } from '../middleware/WhitelistMiddleware';
 import { adminId } from '../config';
 
-const whitelistMiddleware = new WhitelistMiddleware();
 
 export const requestAccess: Command = {
-  execute: async (msg) => {
+	//@ts-ignore
+  executeWithMiddleware: async (msg, whitelistMiddleware: WhitelistMiddleware) => {
 	console.log("Request access");
 	console.log("msg content: ", msg);
     const userId = msg.from!.id;

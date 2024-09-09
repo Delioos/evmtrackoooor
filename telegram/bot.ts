@@ -15,7 +15,7 @@ export class Bot {
 		}
 		Bot.singleton = this;
 		this.bot = new TelegramBot(token!, { polling: true });
-		this.dispatcher = new CommandDispatcher();
+		this.dispatcher = new CommandDispatcher(this.bot);
 		this.messageSender = new MessageSender(this.bot);
 	}
 
