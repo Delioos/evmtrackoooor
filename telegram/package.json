@@ -16,8 +16,10 @@
   "dependencies": {
     "@types/node": "^22.5.4",
     "@types/node-telegram-bot-api": "^0.64.7",
+    "@types/ws": "^8.5.12",
     "axios": "^1.7.7",
     "dotenv": "^16.4.5",
-    "node-telegram-bot-api": "^0.66.0"
+    "node-telegram-bot-api": "^0.66.0",
+    "ws": "^8.18.0"
   }
 }
