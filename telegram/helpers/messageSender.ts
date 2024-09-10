@@ -2,11 +2,9 @@ import TelegramBot from 'node-telegram-bot-api';
 
 class MessageSender {
   private bot: TelegramBot;
-
   constructor(bot: TelegramBot) {
     this.bot = bot;
   }
-
   async sendMessage(chatId: number, text: string, options?: TelegramBot.SendMessageOptions): Promise<TelegramBot.Message | null> {
     try {
       return await this.bot.sendMessage(chatId, text, { parse_mode: 'Markdown', ...options });
@@ -18,5 +16,4 @@ class MessageSender {
     }
   }
 }
-
 export default MessageSender;

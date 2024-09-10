@@ -4,14 +4,33 @@ use colored::Colorize;
 mod models;
 mod app_state;
 mod handlers;
+mod notificatooor;
 
 use app_state::AppState;
+use notificatooor::{Notificator, run_notificator, Notification};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let app_state = web::Data::new(AppState::new());
 
-    println!("{}", "Server starting at http://127.0.0.1:8080".cyan());
+    // Initialize the notificator
+    let (notificator, rx) = Notificator::new();
+    let clients = notificator.clients.clone();
+
+    // Spawn the notificator WebSocket server
+    tokio::spawn(async move {
+        notificator.start(8081).await;
+    });
+
+    // Spawn the notification handler
+    tokio::spawn(async move {
+        run_notificator(rx, clients).await;
+    });
+
+
+    
+    println!("{}", "HTTP Server starting at http://127.0.0.1:8080".cyan());
+    println!("{}", "WebSocket server starting at ws://127.0.0.1:8081/ws".cyan());
 
     HttpServer::new(move || {
         App::new()
