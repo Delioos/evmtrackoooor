@@ -50,6 +50,8 @@ export class CommandDispatcher {
 	async handleCallbackQuery(query: TelegramBot.CallbackQuery) {
 		const [action, userId] = query.data!.split('_');
 		const adminChatId = query.message?.chat.id;
+		const user = query.message!.from!;
+		console.log("DISPATCHER LOG user", user);
 
 		if (adminChatId !== Number(adminId)) {
 			// Retourner si l'appel ne vient pas de l'admin
@@ -59,6 +61,7 @@ export class CommandDispatcher {
 		switch (action) {
 			case 'accept':
 				try {
+					console.log("in dispatcher");
 					await this.whitelistMiddleware.acceptAccessRequest(Number(userId));
 					await this.bot.answerCallbackQuery(query.id, { text: 'User approved' });
 				} catch (error) {

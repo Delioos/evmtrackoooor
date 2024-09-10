@@ -2,6 +2,7 @@ import type { Middleware } from './Middleware';
 import TelegramBot from 'node-telegram-bot-api';
 import { sendMessage } from '../bot';
 import { adminId } from '../config';
+import { apiClient } from '../helpers/apiClient';
 
 export class WhitelistMiddleware implements Middleware {
   private whitelist: Set<number> = new Set();
@@ -25,9 +26,20 @@ export class WhitelistMiddleware implements Middleware {
   }
 
   addWhitelisted(userId: number) {
-	console.log("addWhitelisted", userId);
-    this.whitelist.add(userId);
+  console.log("addWhitelisted", userId);
+  this.whitelist.add(userId);
+  const userInfos = {
+    id: userId,
+    username: this.getPendingUsername(userId),
+    altitude: true,
+    active: true,
+    watchlist: []
   }
+  apiClient.post('/users', userInfos).then((res) => {
+    console.log("res", res);
+  });
+}
+
 
   removeWhitelisted(userId: number) {
     this.whitelist.delete(userId);
@@ -38,6 +50,7 @@ export class WhitelistMiddleware implements Middleware {
   }
 
   getPendingUsername(userId: number): string {
+	  console.log('just pulled', userId);
     return this.pendingRequests.get(userId) || 'Unknown';
   }
 
@@ -50,6 +63,7 @@ export class WhitelistMiddleware implements Middleware {
   }
 
   async acceptAccessRequest(userId: number) {
+	console.log("acceptAccessRequest", userId);
       this.addWhitelisted(userId);
       this.removePendingRequest(userId);
       //const username = this.getPendingUsername(userId);

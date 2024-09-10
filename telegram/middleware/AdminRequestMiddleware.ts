@@ -7,6 +7,7 @@ import { WhitelistMiddleware } from './WhitelistMiddleware';
 
 const whitelistMiddleware = new WhitelistMiddleware();
 
+// TODO: should handle the call back and take a whitelistMiddleware as parameter but will fix later
 export class AdminRequestMiddleware implements Middleware {
   process(msg: TelegramBot.Message, next: () => void) {
     // This middleware doesn't need to do anything for regular messages
@@ -22,6 +23,7 @@ export class AdminRequestMiddleware implements Middleware {
 
     if (action === 'accept') {
       try {
+	console.log("accept");
         await apiClient.post('/users', {
           id: userId,
           username: whitelistMiddleware.getPendingUsername(userId) || 'Unknown',
