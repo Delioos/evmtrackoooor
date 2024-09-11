@@ -1,4 +1,3 @@
-// Notificator is a simple notification interface pushing notifications to users through web sockets.
 use tokio::sync::mpsc;
 use warp::ws::{Message, WebSocket};
 use warp::Filter;
@@ -9,6 +8,8 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use std::collections::HashMap;
 use rand::Rng;
+use rand::rngs::StdRng;
+use rand::SeedableRng;
 use tokio::time::{sleep, Duration};
 use uuid::Uuid;
 
@@ -16,6 +17,12 @@ use uuid::Uuid;
 pub struct Notification {
     id: i64,  // Telegram user ID
     message: String,
+}
+
+impl Notification {
+    pub fn new(id: i64, message: String) -> Self {
+        Self { id, message }
+    }
 }
 
 type Clients = Arc<Mutex<HashMap<String, mpsc::UnboundedSender<Result<Message, warp::Error>>>>>;
@@ -50,6 +57,7 @@ impl Notificator {
     }
 
     pub fn send_notification(&self, notification: Notification) {
+        println!("Sending notification: {:?}", notification);
         if let Err(e) = self.tx.send(notification) {
             eprintln!("Error sending notification: {}", e);
         }
@@ -102,30 +110,43 @@ pub async fn run_notificator(mut rx: mpsc::UnboundedReceiver<Notification>, clie
     }
 }
 
-#[tokio::test]
-async fn test_send_random_notification() {
-    let (notificator, rx) = Notificator::new();
-
-    // Spawn the notificator WebSocket server
-    tokio::spawn(async move {
-        notificator.start(8081).await;
-    });
-
-    // Spawn the notificator receiver
-    tokio::spawn(async move {
-        run_notificator(rx, notificator.clients.clone()).await;
-    });
-
-    let mut rng = rand::thread_rng();
+// Function to generate random notifications and send them every 2 seconds
+pub async fn generate_random_notifications(notificator: Notificator) {
+    let mut rng = StdRng::from_entropy();
+    let mut id_counter = 1;
 
     loop {
-        let id = rng.gen_range(0..100);
-        let message = format!("Test notification {}", id);
-        let notification = Notification { id, message };
+        let notification = Notification {
+            id: id_counter,
+            message: format!("Random notification #{}", rng.gen_range(1..100)),
+        };
 
         notificator.send_notification(notification);
+        id_counter += 1;
 
-        sleep(Duration::from_secs(4)).await;
+        sleep(Duration::from_secs(2)).await;
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::sync::mpsc;
+
+    #[tokio::test]
+    async fn test_notification() {
+        println!("Starting test");
+        let (notificator, rx) = Notificator::new();
+        let clients = notificator.clients.clone();
+
+        tokio::spawn(run_notificator(rx, clients));
+        tokio::spawn(generate_random_notifications(notificator.clone()));
+
+        notificator.send_notification(Notification {
+            id: 1,
+            message: "Test notification".to_string(),
+        });
     }
 }
 
