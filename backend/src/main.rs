@@ -30,8 +30,12 @@ async fn main() -> std::io::Result<()> {
     let clients = notificator.clients.clone();
     
     let subscribe_manager = SubscribeManager::new();
+    let vars = env::vars().collect::<Vec<_>>();
+    for (key, value) in vars {
+        println!("{}: {}", key, value);
+    }
 
-    let url = env::var("ENDPOINT:").expect("ENDPOINT must be set");
+    let url = env::var("ENDPOINT").expect("ENDPOINT must be set");
     println!("RPC URL: {}", url);
     
     // Initialize the block processor
