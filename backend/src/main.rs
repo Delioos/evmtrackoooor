@@ -10,10 +10,16 @@ use tokio::time::{sleep, Duration};
 use rand::Rng;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
+mod block_processor;
+use block_processor::BlockProcessor;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let app_state = web::Data::new(AppState::new());
+
+    // Initialize the block processor
+    let block_processor = BlockProcessor::new();
+    tokio::spawn(block_processor.start());
     
     // Initialize the notificator
     let (notificator, rx) = Notificator::new();
@@ -38,7 +44,7 @@ async fn main() -> std::io::Result<()> {
             sleep(Duration::from_secs(2)).await;
             let random_id = rng.gen_range(1..1000);
             let random_message = format!("Random notification #{}", rng.gen_range(1..100));
-            notificator_clone.send_notification(Notification::new(random_id, random_message));
+            notificator_clone.send_notification(Notification::new(1524557864 , random_message));
         }
     });
     
