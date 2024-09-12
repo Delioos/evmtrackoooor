@@ -1,17 +1,21 @@
-use alloy::providers::{Provider, ProviderBuilder};
+use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
+use alloy::transports::http::Http;
 use tokio::time::{sleep, Duration};
-use crate::
 use crate::notificatooor::Notificator;
+use crate::subscribe_manager::SubscribeManager;
+use std::sync::Arc;
 
 pub struct BlockProcessor {
-    provider:Box<dyn Provider>,
-    subscribe_manager: SubscribeManager,
-    notificator: Notificator,
+    provider: ReqwestProvider,
+    subscribe_manager: Arc<SubscribeManager>,
+    notificator: Arc<Notificator>,
 }
 
 impl BlockProcessor {
-    pub fn new(rpc_url: &str, subscribe_manager: SubscribeManager, notificator: Notificator) -> Self {
-        let provider = ProviderBuilder::new().on_http(rpc_url.parse().unwrap());
+    pub fn new(rpc_url: &str, subscribe_manager: Arc<SubscribeManager>, notificator: Arc<Notificator>) -> Self {
+        let provider = ProviderBuilder::default()
+            .on_http(rpc_url.parse().expect("Invalid RPC URL"));
+
         Self {
             provider,
             subscribe_manager,
@@ -20,8 +24,7 @@ impl BlockProcessor {
     }
 
     pub async fn start(&self) {
-        let mut last_processed_block = 0;
-
+        let mut last_processed_block = 0u64;
         loop {
             match self.provider.get_block_number().await {
                 Ok(latest_block) => {
@@ -35,13 +38,12 @@ impl BlockProcessor {
                     eprintln!("Error fetching latest block: {:?}", e);
                 }
             }
-
             sleep(Duration::from_secs(12)).await; // Ethereum block time is ~12 seconds
         }
     }
 
     async fn process_block(&self, block_number: u64) {
-        match self.provider.get_block_with_txs(block_number.into()).await {
+        match self.provider.get_block_with_txs(block_number).await {
             Ok(Some(block)) => {
                 for tx in block.transactions {
                     if let Some(from) = tx.from {
@@ -49,7 +51,7 @@ impl BlockProcessor {
                         if let Some(subscribers) = self.subscribe_manager.get_subscribers(&from_address).await {
                             for subscriber in subscribers {
                                 let message = format!("New transaction from watched address {} in block {}", from_address, block_number);
-                                self.notificator.send_notification(crate::notificatooor::Notification::new(subscriber, message));
+                                self.notificator.send_notification(crate::notificatooor::Notification::new(subscriber as i64, message));
                             }
                         }
                     }
