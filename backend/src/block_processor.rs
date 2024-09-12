@@ -1,5 +1,6 @@
 use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
-use alloy::transports::http::Http;
+use alloy::primitives::Address; 
+use alloy::rpc::types::BlockNumberOrTag;
 use tokio::time::{sleep, Duration};
 use crate::notificatooor::Notificator;
 use crate::subscribe_manager::SubscribeManager;
@@ -43,10 +44,14 @@ impl BlockProcessor {
     }
 
     async fn process_block(&self, block_number: u64) {
-        match self.provider.get_block_with_txs(block_number).await {
+        match self.provider.get_block_by_number(BlockNumberOrTag::Number(block_number), true).await {
             Ok(Some(block)) => {
-                for tx in block.transactions {
-                    if let Some(from) = tx.from {
+                println!("Processing block {}", block_number);
+                for tx in block.transactions.into_transactions() {
+                    println!("Processing transaction {}", tx.hash);
+                    // TODO: Should be enhanced but indexer will just do it later 
+                    if let Some(from) = Option::<Address>::from(tx.from) {
+                        println!("From address: {}", from);
                         let from_address = format!("{:?}", from);
                         if let Some(subscribers) = self.subscribe_manager.get_subscribers(&from_address).await {
                             for subscriber in subscribers {

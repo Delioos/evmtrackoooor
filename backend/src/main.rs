@@ -4,26 +4,47 @@ mod models;
 mod app_state;
 mod handlers;
 mod notificatooor;
+mod block_processor;
+mod subscribe_manager;
+
 use app_state::AppState;
 use notificatooor::{Notificator, run_notificator, Notification};
+use block_processor::BlockProcessor;
+use subscribe_manager::SubscribeManager;
+
 use tokio::time::{sleep, Duration};
 use rand::Rng;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
-mod block_processor;
-use block_processor::BlockProcessor;
+use std::env;
+use std::sync::Arc;
+
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    // Initialize the app state with the new SubscribeManager
     let app_state = web::Data::new(AppState::new());
-
-    // Initialize the block processor
-    let block_processor = BlockProcessor::new();
-    tokio::spawn(block_processor.start());
     
     // Initialize the notificator
     let (notificator, rx) = Notificator::new();
     let clients = notificator.clients.clone();
+    
+    let subscribe_manager = SubscribeManager::new();
+
+    let url = env::var("ENDPOINT:").expect("ENDPOINT must be set");
+    println!("RPC URL: {}", url);
+    
+    // Initialize the block processor
+    let block_processor = BlockProcessor::new(
+        &url,
+        Arc::new(subscribe_manager.clone()),
+        Arc::new(notificator.clone())
+    );
+    
+    // Spawn the block processor
+    tokio::spawn(async move {
+        block_processor.start().await;
+    });
     
     // Spawn the notificator WebSocket server
     let notificator_clone = notificator.clone();
@@ -36,7 +57,7 @@ async fn main() -> std::io::Result<()> {
         run_notificator(rx, clients).await;
     });
     
-    // Spawn the random notification generator
+    // Spawn the random notification generator (for testing purposes)
     let notificator_clone = notificator.clone();
     tokio::spawn(async move {
         let mut rng = StdRng::from_entropy();
@@ -44,7 +65,7 @@ async fn main() -> std::io::Result<()> {
             sleep(Duration::from_secs(2)).await;
             let random_id = rng.gen_range(1..1000);
             let random_message = format!("Random notification #{}", rng.gen_range(1..100));
-            notificator_clone.send_notification(Notification::new(1524557864 , random_message));
+            notificator_clone.send_notification(Notification::new(random_id, random_message));
         }
     });
     

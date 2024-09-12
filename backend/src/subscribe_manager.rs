@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use tokio::sync::RwLock;
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct SubscribeManager {
     subscriptions: Arc<RwLock<HashMap<String, Vec<i32>>>>,
 }
