@@ -3,6 +3,7 @@ use colored::Colorize;
 use crate::models::User;
 use crate::app_state::AppState;
 
+
 pub async fn create_user(data: web::Data<AppState>, user: web::Json<User>) -> impl Responder {
     println!("{}", "POST /users".green());
     let mut users = data.users.write().await;
