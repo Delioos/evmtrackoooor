@@ -14,6 +14,7 @@ pub  async fn authenticate(
     let api_key = std::env::var("API_KEY").expect("API_KEY must be set");
     let header_api_key = req.headers().get("api_key");
     if header_api_key != Some(&header::HeaderValue::from_str(&api_key).unwrap()) {
+        println!("received key: {:?}", header_api_key);
         return Err(actix_web::error::ErrorBadRequest("Invalid API key"));
     }
 
