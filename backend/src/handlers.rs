@@ -67,35 +67,76 @@ pub async fn get_all_users(data: web::Data<AppState>) -> impl Responder {
     HttpResponse::Ok().json(users_vec)
 }
 
-pub async fn add_wallet_to_watchlist(data: web::Data<AppState>, id: web::Path<i32>, wallet: web::Json<String>) -> impl Responder {
+pub async fn add_wallet_to_watchlist(
+    data: web::Data<AppState>,
+    id: web::Path<i32>,
+    wallet: web::Json<String>
+) -> impl Responder {
     println!("{}", format!("POST /users/{}/watchlist", id).green());
+
+    let user_id = id.into_inner();
+    let wallet_address = wallet.into_inner();
+
+    // Vérifier d'abord si l'utilisateur existe
+    let user_exists = {
+        let users = data.users.read().await;
+        users.contains_key(&user_id)
+    };
+
+    if !user_exists {
+        return HttpResponse::NotFound().finish();
+    }
+
+    // Ajouter l'abonnement de manière asynchrone
+    data.subscribe_manager.add_subscriber(&wallet_address, user_id).await;
+
+    // Mettre à jour la watchlist de l'utilisateur
     let mut users = data.users.write().await;
-    match users.get_mut(&id) {
-        Some(user) => {
-            if !user.watchlist.contains(&wallet) {
-                user.watchlist.push(wallet.into_inner());
-                HttpResponse::Ok().json(user)
-            } else {
-                HttpResponse::BadRequest().body("Wallet already in watchlist")
-            }
-        },
-        None => HttpResponse::NotFound().finish()
+    let user = users.get_mut(&user_id).unwrap(); // Safe because we checked existence
+
+    if !user.watchlist.contains(&wallet_address) {
+        user.watchlist.push(wallet_address.clone());
+        HttpResponse::Ok().json(user)
+    } else {
+        HttpResponse::BadRequest().body("Wallet already in watchlist")
     }
 }
 
-pub async fn remove_wallet_from_watchlist(data: web::Data<AppState>, id: web::Path<i32>, wallet: web::Json<String>) -> impl Responder {
+pub async fn remove_wallet_from_watchlist(
+    data: web::Data<AppState>,
+    id: web::Path<i32>,
+    wallet: web::Json<String>
+) -> impl Responder {
     println!("{}", format!("DELETE /users/{}/watchlist", id).red());
+
+    let user_id = id.into_inner();
+    let wallet_address = wallet.into_inner();
+
+    // Vérifier d'abord si l'utilisateur existe
+    let user_exists = {
+        let users = data.users.read().await;
+        users.contains_key(&user_id)
+    };
+
+    if !user_exists {
+        return HttpResponse::NotFound().finish();
+    }
+
+    // Mettre à jour la watchlist de l'utilisateur
     let mut users = data.users.write().await;
-    match users.get_mut(&id) {
-        Some(user) => {
-            let wallet_as_string = wallet.into_inner();
-            if let Some(pos) = user.watchlist.iter().position(|x| x == &wallet_as_string) {
-                user.watchlist.remove(pos);
-                HttpResponse::Ok().json(user)
-            } else {
-                HttpResponse::BadRequest().body("Wallet not found in watchlist")
-            }
-        },
-        None => HttpResponse::NotFound().finish(),
+    let user = users.get_mut(&user_id).unwrap(); // Safe because we checked existence
+
+    if let Some(pos) = user.watchlist.iter().position(|x| x == &wallet_address) {
+        user.watchlist.remove(pos);
+        
+        // Supprimer l'abonnement de manière asynchrone
+        let subscribe_manager = data.subscribe_manager.clone();
+        tokio::spawn(async move {
+            subscribe_manager.remove_subscriber(&wallet_address, user_id).await;
+        });
+
+        HttpResponse::Ok().json(user)
+    } else {
+        HttpResponse::BadRequest().body("Wallet not found in watchlist")
     }
 }

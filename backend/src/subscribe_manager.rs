@@ -1,10 +1,11 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 use tokio::sync::RwLock;
 use std::sync::Arc;
+use alloy::primitives::Address;
 
 #[derive(Clone)]
 pub struct SubscribeManager {
-    subscriptions: Arc<RwLock<HashMap<String, Vec<i32>>>>,
+    subscriptions: Arc<RwLock<HashMap<Address, Vec<i32>>>>,
 }
 
 impl SubscribeManager {
@@ -15,24 +16,33 @@ impl SubscribeManager {
     }
 
     pub async fn add_subscriber(&self, address: &str, user_id: i32) {
+        println!("add_subscriber from subscribe_manager");
         let mut subscriptions = self.subscriptions.write().await;
-        subscriptions.entry(address.to_string())
+        // TODO: enhance error handling
+        let onchain_addy = Address::from_str(address).unwrap();
+        subscriptions.entry(onchain_addy)
             .or_insert_with(Vec::new)
             .push(user_id);
+
+        println!("add_subscriber done {}", subscriptions.len());
+        println!("new subscribers {:?}", subscriptions);
     }
 
     pub async fn remove_subscriber(&self, address: &str, user_id: i32) {
+        println!("remove_subscriber from subscribe_manager");
         let mut subscriptions = self.subscriptions.write().await;
-        if let Some(subscribers) = subscriptions.get_mut(address) {
+        let onchain_addy = Address::from_str(address).unwrap();
+        if let Some(subscribers) = subscriptions.get_mut(&onchain_addy) {
             subscribers.retain(|&id| id != user_id);
             if subscribers.is_empty() {
-                subscriptions.remove(address);
+                subscriptions.remove(&onchain_addy);
             }
         }
     }
 
-    pub async fn get_subscribers(&self, address: &str) -> Option<Vec<i32>> {
+    // Methode denormalisee qui a pour vocation de servir de read efficace lors du parcours de tx 
+    pub async fn get_subscribers(&self, address: Address) -> Option<Vec<i32>> {
         let subscriptions = self.subscriptions.read().await;
-        subscriptions.get(address).cloned()
+        subscriptions.get(&address).cloned()
     }
 }

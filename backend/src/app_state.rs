@@ -10,24 +10,10 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new() -> Self {
+    pub fn new(sb : SubscribeManager) -> Self {
         AppState {
             users: Arc::new(RwLock::new(HashMap::new())),
-            subscribe_manager: SubscribeManager::new(),
+            subscribe_manager: sb, 
         }
-    }
-
-    /*
-     * Returns a list of subscribers for a given address
-     *
-     * @ param address: The address to get subscribers for
-     * @ return: A list of subscribers (their telegram id) for the given address
-     */
-    pub async fn get_subscribers(&self, address: &str) -> Vec<i32> {
-        let users = self.users.read().await;
-        users.values()
-            .filter(|user| user.active && user.watchlist.contains(&address.to_string()))
-            .map(|user| user.id)
-            .collect()
     }
 }

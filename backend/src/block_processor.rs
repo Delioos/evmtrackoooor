@@ -46,15 +46,17 @@ impl BlockProcessor {
     async fn process_block(&self, block_number: u64) {
         match self.provider.get_block_by_number(BlockNumberOrTag::Number(block_number), true).await {
             Ok(Some(block)) => {
-                println!("Processing block {}", block_number);
+                //println!("Processing block {}", block_number);
                 for tx in block.transactions.into_transactions() {
-                    println!("Processing transaction {}", tx.hash);
+                    //println!("Processing transaction {}", tx.hash);
                     // TODO: Should be enhanced but indexer will just do it later 
-                    if let Some(from) = Option::<Address>::from(tx.from) {
-                        println!("From address: {}", from);
+                    if let Some(from) = Option::from(tx.from) {
+                        //println!("From address: {}", from);
                         let from_address = format!("{:?}", from);
-                        if let Some(subscribers) = self.subscribe_manager.get_subscribers(&from_address).await {
+                        println!("From address: {} ", from_address);
+                        if let Some(subscribers) = self.subscribe_manager.get_subscribers(from).await {
                             for subscriber in subscribers {
+                                println!("Sending notification to {}", subscriber);
                                 let message = format!("New transaction from watched address {} in block {}", from_address, block_number);
                                 self.notificator.send_notification(crate::notificatooor::Notification::new(subscriber as i64, message));
                             }
