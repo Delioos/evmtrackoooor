@@ -50,11 +50,13 @@ impl BlockProcessor {
                 for tx in block.transactions.into_transactions() {
                     //println!("Processing transaction {}", tx.hash);
                     // TODO: Should be enhanced but indexer will just do it later 
-                    if let Some(from) = Option::<Address>::from(tx.from) {
+                    if let Some(from) = Option::from(tx.from) {
                         //println!("From address: {}", from);
                         let from_address = format!("{:?}", from);
-                        if let Some(subscribers) = self.subscribe_manager.get_subscribers(&from_address).await {
+                        println!("From address: {} ", from_address);
+                        if let Some(subscribers) = self.subscribe_manager.get_subscribers(from).await {
                             for subscriber in subscribers {
+                                println!("Sending notification to {}", subscriber);
                                 let message = format!("New transaction from watched address {} in block {}", from_address, block_number);
                                 self.notificator.send_notification(crate::notificatooor::Notification::new(subscriber as i64, message));
                             }

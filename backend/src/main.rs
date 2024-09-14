@@ -29,13 +29,13 @@ async fn main() -> std::io::Result<()> {
     let api_key = std::env::var("API_KEY").expect("API_KEY must be set");
     println!("API_KEY: {}", api_key.cyan().on_bright_white());
     // Initialize the app state with the new SubscribeManager
-    let app_state = web::Data::new(AppState::new());
+    let subscribe_manager = SubscribeManager::new();
+    let app_state = web::Data::new(AppState::new(subscribe_manager.clone()));
 
     // Initialize the notificator
     let (notificator, rx) = Notificator::new();
     let clients = notificator.clients.clone();
 
-    let subscribe_manager = SubscribeManager::new();
 
     // Initialize the block processor
     let block_processor = BlockProcessor::new(
