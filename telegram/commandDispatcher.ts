@@ -48,10 +48,9 @@ export class CommandDispatcher {
 	// May should be moved to request acces or a helper but not sure and it not so sloppy to do it here I guess
 	// TODO: Move to a helper
 	async handleCallbackQuery(query: TelegramBot.CallbackQuery) {
+		console.log("DISPATCHER LOG query -----------------------------------------------", query);
 		const [action, userId] = query.data!.split('_');
 		const adminChatId = query.message?.chat.id;
-		const user = query.message!.from!;
-		console.log("DISPATCHER LOG user", user);
 
 		if (adminChatId !== Number(adminId)) {
 			// Retourner si l'appel ne vient pas de l'admin
@@ -61,7 +60,8 @@ export class CommandDispatcher {
 		switch (action) {
 			case 'accept':
 				try {
-					console.log("in dispatcher");
+					console.log("in dispatcher meow meow");
+					// TODO: FIX THIS to add any user to the bot lmeow
 					await this.whitelistMiddleware.acceptAccessRequest(Number(userId));
 					await this.bot.answerCallbackQuery(query.id, { text: 'User approved' });
 				} catch (error) {

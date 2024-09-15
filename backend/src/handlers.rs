@@ -5,6 +5,7 @@ use crate::app_state::AppState;
 
 pub async fn create_user(data: web::Data<AppState>, user: web::Json<User>) -> impl Responder {
     println!("{}", "POST /users".green());
+    // TODO: Check if user already exists
     let mut users = data.users.write().await;
     let new_user = User {
         id: user.id,
@@ -18,7 +19,7 @@ pub async fn create_user(data: web::Data<AppState>, user: web::Json<User>) -> im
     HttpResponse::Created().json(new_user)
 }
 
-pub async fn get_user(data: web::Data<AppState>, id: web::Path<i32>) -> impl Responder {
+pub async fn get_user(data: web::Data<AppState>, id: web::Path<u64>) -> impl Responder {
     println!("{}", format!("GET /users/{}", id).blue());
     let users = data.users.read().await;
     match users.get(&id) {
@@ -27,7 +28,7 @@ pub async fn get_user(data: web::Data<AppState>, id: web::Path<i32>) -> impl Res
     }
 }
 
-pub async fn get_watchlist(data: web::Data<AppState>, id: web::Path<i32>) -> impl Responder {
+pub async fn get_watchlist(data: web::Data<AppState>, id: web::Path<u64>) -> impl Responder {
     println!("{}", format!("GET /users/{}/watchlist", id).blue());
     let users = data.users.read().await;
     match users.get(&id) {
@@ -36,7 +37,7 @@ pub async fn get_watchlist(data: web::Data<AppState>, id: web::Path<i32>) -> imp
     }
 }
 
-pub async fn update_user(data: web::Data<AppState>, id: web::Path<i32>, user: web::Json<User>) -> impl Responder {
+pub async fn update_user(data: web::Data<AppState>, id: web::Path<u64>, user: web::Json<User>) -> impl Responder {
     println!("{}", format!("PUT /users/{}", id).yellow());
     let mut users = data.users.write().await;
     match users.get_mut(&id) {
@@ -50,7 +51,7 @@ pub async fn update_user(data: web::Data<AppState>, id: web::Path<i32>, user: we
     }
 }
 
-pub async fn delete_user(data: web::Data<AppState>, id: web::Path<i32>) -> impl Responder {
+pub async fn delete_user(data: web::Data<AppState>, id: web::Path<u64>) -> impl Responder {
     println!("{}", format!("DELETE /users/{}", id).red());
     let mut users = data.users.write().await;
     if users.remove(&id).is_some() {
@@ -69,7 +70,7 @@ pub async fn get_all_users(data: web::Data<AppState>) -> impl Responder {
 
 pub async fn add_wallet_to_watchlist(
     data: web::Data<AppState>,
-    id: web::Path<i32>,
+    id: web::Path<u64>,
     wallet: web::Json<String>
 ) -> impl Responder {
     println!("{}", format!("POST /users/{}/watchlist", id).green());
@@ -104,7 +105,7 @@ pub async fn add_wallet_to_watchlist(
 
 pub async fn remove_wallet_from_watchlist(
     data: web::Data<AppState>,
-    id: web::Path<i32>,
+    id: web::Path<u64>,
     wallet: web::Json<String>
 ) -> impl Responder {
     println!("{}", format!("DELETE /users/{}/watchlist", id).red());

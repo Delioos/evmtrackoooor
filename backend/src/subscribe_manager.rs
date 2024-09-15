@@ -5,7 +5,7 @@ use alloy::primitives::Address;
 
 #[derive(Clone)]
 pub struct SubscribeManager {
-    subscriptions: Arc<RwLock<HashMap<Address, Vec<i32>>>>,
+    subscriptions: Arc<RwLock<HashMap<Address, Vec<u64>>>>,
 }
 
 impl SubscribeManager {
@@ -15,7 +15,7 @@ impl SubscribeManager {
         }
     }
 
-    pub async fn add_subscriber(&self, address: &str, user_id: i32) {
+    pub async fn add_subscriber(&self, address: &str, user_id: u64) {
         println!("add_subscriber from subscribe_manager");
         let mut subscriptions = self.subscriptions.write().await;
         // TODO: enhance error handling
@@ -28,7 +28,7 @@ impl SubscribeManager {
         println!("new subscribers {:?}", subscriptions);
     }
 
-    pub async fn remove_subscriber(&self, address: &str, user_id: i32) {
+    pub async fn remove_subscriber(&self, address: &str, user_id: u64) {
         println!("remove_subscriber from subscribe_manager");
         let mut subscriptions = self.subscriptions.write().await;
         let onchain_addy = Address::from_str(address).unwrap();
@@ -41,7 +41,7 @@ impl SubscribeManager {
     }
 
     // Methode denormalisee qui a pour vocation de servir de read efficace lors du parcours de tx 
-    pub async fn get_subscribers(&self, address: Address) -> Option<Vec<i32>> {
+    pub async fn get_subscribers(&self, address: Address) -> Option<Vec<u64>> {
         let subscriptions = self.subscriptions.read().await;
         subscriptions.get(&address).cloned()
     }

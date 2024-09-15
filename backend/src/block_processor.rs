@@ -52,8 +52,10 @@ impl BlockProcessor {
                     // TODO: Should be enhanced but indexer will just do it later 
                     if let Some(from) = Option::from(tx.from) {
                         //println!("From address: {}", from);
-                        let from_address = format!("{:?}", from);
-                        println!("From address: {} ", from_address);
+                        // TODO: Decode swaps 
+                        
+                        let from_address = Address::from(from);
+                        
                         if let Some(subscribers) = self.subscribe_manager.get_subscribers(from).await {
                             for subscriber in subscribers {
                                 println!("Sending notification to {}", subscriber);

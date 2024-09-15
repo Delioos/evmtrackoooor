@@ -1,6 +1,7 @@
 import type { Command } from '../types';
 import { sendMessage } from '../bot';
 import { apiClient } from '../helpers/apiClient';
+import { isValidAddy } from '../middleware/isValidAddy';
 
 export const bulkImport: Command = {
   execute: async (msg) => {
@@ -11,6 +12,9 @@ export const bulkImport: Command = {
     }
     try {
       for (const wallet of wallets) {
+				if (!isValidAddy(wallet)) {
+					await sendMessage(msg.chat.id, `${wallet} is not a valid EVM wallet address.`);
+				}
         await apiClient.post(`/users/${msg.from!.id}/watchlist`, JSON.stringify(wallet));
       }
       await sendMessage(msg.chat.id, `Successfully added ${wallets.length} wallet(s) to your watchlist.`);

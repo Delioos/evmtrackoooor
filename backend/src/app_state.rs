@@ -5,7 +5,7 @@ use crate::models::User;
 use crate::subscribe_manager::SubscribeManager;
 
 pub struct AppState {
-    pub users: Arc<RwLock<HashMap<i32, User>>>,
+    pub users: Arc<RwLock<HashMap<u64, User>>>,
     pub subscribe_manager: SubscribeManager,
 }
 

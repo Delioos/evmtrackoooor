@@ -11,6 +11,10 @@ pub  async fn authenticate(
 ) -> Result<ServiceResponse<impl MessageBody>, Error> {
     // pre-processing
     dotenv().ok();
+
+    // log incoming request 
+    println!("request: {:?}", req);
+    println!("path: {:?}", req.path() );
     let api_key = std::env::var("API_KEY").expect("API_KEY must be set");
     let header_api_key = req.headers().get("api_key");
     if header_api_key != Some(&header::HeaderValue::from_str(&api_key).unwrap()) {
