@@ -18,7 +18,7 @@ export const track: Command = {
       }
 
       const userId = msg.from!.id;
-      await apiClient('POST', `/users/${userId}/watchlist`, JSON.stringify( wallet ));
+      await apiClient('POST', `/users/${userId}/watchlist`, ( wallet ));
       await sendMessage(msg.chat.id, `Successfully added ${wallet} to your watchlist.`);
     } catch (error) {
       console.error('Error adding wallet to watchlist:', error);

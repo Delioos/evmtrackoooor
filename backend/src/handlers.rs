@@ -1,6 +1,6 @@
 use crate::app_state::AppState;
 use crate::models::User;
-use crate::subscribe_manager::SubscriberError; // Add this import
+use crate::subscribe_manager::SubscriberError;
 use actix_web::{web, HttpResponse, Responder};
 use colored::Colorize;
 use thiserror::Error;

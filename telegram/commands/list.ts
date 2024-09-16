@@ -7,7 +7,7 @@ export const list: Command = {
     try {
       const response = await apiClient('GET', `/users/${msg.from!.id}/watchlist`);
       console.log('response ',response)
-      const wallets = response.data;
+      const wallets = response;
       if (wallets.length === 0) {
         await sendMessage(msg.chat.id, "You are not tracking any wallets.");
       } else {
