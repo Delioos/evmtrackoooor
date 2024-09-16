@@ -5,7 +5,8 @@ import { apiClient } from '../helpers/apiClient';
 export const list: Command = {
   execute: async (msg) => {
     try {
-      const response = await apiClient.get(`/users/${msg.from!.id}/watchlist`);
+      const response = await apiClient('GET', `/users/${msg.from!.id}/watchlist`);
+      console.log('response ',response)
       const wallets = response.data;
       if (wallets.length === 0) {
         await sendMessage(msg.chat.id, "You are not tracking any wallets.");
