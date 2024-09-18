@@ -1,10 +1,24 @@
+use crate::app_state::AppState;
+use crate::models::User;
+use crate::subscribe_manager::SubscriberError;
 use actix_web::{web, HttpResponse, Responder};
 use colored::Colorize;
-use crate::models::User;
-use crate::app_state::AppState;
+use thiserror::Error;
+use tracing::{debug, error, info};
+
+#[derive(Error, Debug)]
+pub enum WatchlistError {
+    #[error("User not found")]
+    UserNotFound,
+    #[error("Wallet already in watchlist")]
+    WalletAlreadyExists,
+    #[error("Failed to add subscriber: {0}")]
+    SubscriberError(#[from] SubscriberError),
+}
 
 pub async fn create_user(data: web::Data<AppState>, user: web::Json<User>) -> impl Responder {
     println!("{}", "POST /users".green());
+    // TODO: Check if user already exists
     let mut users = data.users.write().await;
     let new_user = User {
         id: user.id,
@@ -18,7 +32,7 @@ pub async fn create_user(data: web::Data<AppState>, user: web::Json<User>) -> im
     HttpResponse::Created().json(new_user)
 }
 
-pub async fn get_user(data: web::Data<AppState>, id: web::Path<i32>) -> impl Responder {
+pub async fn get_user(data: web::Data<AppState>, id: web::Path<u64>) -> impl Responder {
     println!("{}", format!("GET /users/{}", id).blue());
     let users = data.users.read().await;
     match users.get(&id) {
@@ -27,7 +41,7 @@ pub async fn get_user(data: web::Data<AppState>, id: web::Path<i32>) -> impl Res
     }
 }
 
-pub async fn get_watchlist(data: web::Data<AppState>, id: web::Path<i32>) -> impl Responder {
+pub async fn get_watchlist(data: web::Data<AppState>, id: web::Path<u64>) -> impl Responder {
     println!("{}", format!("GET /users/{}/watchlist", id).blue());
     let users = data.users.read().await;
     match users.get(&id) {
@@ -36,7 +50,11 @@ pub async fn get_watchlist(data: web::Data<AppState>, id: web::Path<i32>) -> imp
     }
 }
 
-pub async fn update_user(data: web::Data<AppState>, id: web::Path<i32>, user: web::Json<User>) -> impl Responder {
+pub async fn update_user(
+    data: web::Data<AppState>,
+    id: web::Path<u64>,
+    user: web::Json<User>,
+) -> impl Responder {
     println!("{}", format!("PUT /users/{}", id).yellow());
     let mut users = data.users.write().await;
     match users.get_mut(&id) {
@@ -45,12 +63,12 @@ pub async fn update_user(data: web::Data<AppState>, id: web::Path<i32>, user: we
             existing_user.altitude = user.altitude;
             existing_user.active = user.active;
             HttpResponse::Ok().json(existing_user)
-        },
+        }
         None => HttpResponse::NotFound().finish(),
     }
 }
 
-pub async fn delete_user(data: web::Data<AppState>, id: web::Path<i32>) -> impl Responder {
+pub async fn delete_user(data: web::Data<AppState>, id: web::Path<u64>) -> impl Responder {
     println!("{}", format!("DELETE /users/{}", id).red());
     let mut users = data.users.write().await;
     if users.remove(&id).is_some() {
@@ -69,43 +87,64 @@ pub async fn get_all_users(data: web::Data<AppState>) -> impl Responder {
 
 pub async fn add_wallet_to_watchlist(
     data: web::Data<AppState>,
-    id: web::Path<i32>,
-    wallet: web::Json<String>
+    id: web::Path<u64>,
+    wallet: web::Json<String>,
 ) -> impl Responder {
-    println!("{}", format!("POST /users/{}/watchlist", id).green());
-
+    info!("POST /users/{}/watchlist", id);
     let user_id = id.into_inner();
     let wallet_address = wallet.into_inner();
 
-    // Vérifier d'abord si l'utilisateur existe
+    match add_wallet_to_watchlist_inner(&data, user_id, &wallet_address).await {
+        Ok(user) => HttpResponse::Ok().json(user),
+        Err(WatchlistError::UserNotFound) => HttpResponse::NotFound().finish(),
+        Err(WatchlistError::WalletAlreadyExists) => {
+            HttpResponse::BadRequest().body("Wallet already in watchlist")
+        }
+        Err(e) => {
+            error!("Error adding wallet to watchlist: {:?}", e);
+            HttpResponse::InternalServerError().finish()
+        }
+    }
+}
+
+async fn add_wallet_to_watchlist_inner(
+    data: &web::Data<AppState>,
+    user_id: u64,
+    wallet_address: &str,
+) -> Result<User, WatchlistError> {
+    // Check if the user exists
     let user_exists = {
         let users = data.users.read().await;
         users.contains_key(&user_id)
     };
-
     if !user_exists {
-        return HttpResponse::NotFound().finish();
+        return Err(WatchlistError::UserNotFound);
     }
 
-    // Ajouter l'abonnement de manière asynchrone
-    data.subscribe_manager.add_subscriber(&wallet_address, user_id).await;
+    // Add the subscription asynchronously
+    data.subscribe_manager
+        .add_subscriber(wallet_address, user_id)
+        .await?;
 
-    // Mettre à jour la watchlist de l'utilisateur
+    // Update the user's watchlist
     let mut users = data.users.write().await;
     let user = users.get_mut(&user_id).unwrap(); // Safe because we checked existence
-
-    if !user.watchlist.contains(&wallet_address) {
-        user.watchlist.push(wallet_address.clone());
-        HttpResponse::Ok().json(user)
+    if !user.watchlist.contains(&wallet_address.to_string()) {
+        user.watchlist.push(wallet_address.to_string());
+        debug!(
+            "Added wallet {} to user {}'s watchlist",
+            wallet_address, user_id
+        );
+        Ok(user.clone())
     } else {
-        HttpResponse::BadRequest().body("Wallet already in watchlist")
+        Err(WatchlistError::WalletAlreadyExists)
     }
 }
 
 pub async fn remove_wallet_from_watchlist(
     data: web::Data<AppState>,
-    id: web::Path<i32>,
-    wallet: web::Json<String>
+    id: web::Path<u64>,
+    wallet: web::Json<String>,
 ) -> impl Responder {
     println!("{}", format!("DELETE /users/{}/watchlist", id).red());
 
@@ -128,11 +167,13 @@ pub async fn remove_wallet_from_watchlist(
 
     if let Some(pos) = user.watchlist.iter().position(|x| x == &wallet_address) {
         user.watchlist.remove(pos);
-        
+
         // Supprimer l'abonnement de manière asynchrone
         let subscribe_manager = data.subscribe_manager.clone();
         tokio::spawn(async move {
-            subscribe_manager.remove_subscriber(&wallet_address, user_id).await;
+            subscribe_manager
+                .remove_subscriber(&wallet_address, user_id)
+                .await;
         });
 
         HttpResponse::Ok().json(user)

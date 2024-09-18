@@ -1,23 +1,23 @@
-use actix_web::{web, App, HttpServer, middleware};
+use actix_web::{middleware, web, App, HttpServer};
 use colored::Colorize;
-mod models;
 mod app_state;
-mod handlers;
-mod notificatooor;
-mod block_processor;
-mod subscribe_manager;
 mod auth_middleware;
-use auth_middleware::authenticate;
+mod block_processor;
+mod handlers;
+mod log_decoder;
+mod models;
+mod notificatooor;
+mod subscribe_manager;
 use app_state::AppState;
-use notificatooor::{Notificator, run_notificator};
+use auth_middleware::authenticate;
 use block_processor::BlockProcessor;
-use subscribe_manager::SubscribeManager;
 use dotenv::dotenv;
+use log_decoder::LogDecoder;
+use notificatooor::{run_notificator, Notificator};
 use std::sync::Arc;
-
+use subscribe_manager::SubscribeManager;
 
 // simple middleware authorizing req if they got a valid api_key in the headerk
-
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -36,12 +36,11 @@ async fn main() -> std::io::Result<()> {
     let (notificator, rx) = Notificator::new();
     let clients = notificator.clients.clone();
 
-
     // Initialize the block processor
     let block_processor = BlockProcessor::new(
         &url,
         Arc::new(subscribe_manager.clone()),
-        Arc::new(notificator.clone())
+        Arc::new(notificator.clone()),
     );
 
     // Spawn the block processor
@@ -60,9 +59,11 @@ async fn main() -> std::io::Result<()> {
         run_notificator(rx, clients).await;
     });
 
-
     println!("{}", "HTTP Server starting at http://127.0.0.1:8080".cyan());
-    println!("{}", "WebSocket server starting at ws://127.0.0.1:8081/ws".cyan());
+    println!(
+        "{}",
+        "WebSocket server starting at ws://127.0.0.1:8081/ws".cyan()
+    );
 
     HttpServer::new(move || {
         let auth = web::Data::new(api_key.clone());
@@ -75,12 +76,20 @@ async fn main() -> std::io::Result<()> {
             .route("/users/{id}", web::get().to(handlers::get_user))
             .route("/users/{id}", web::put().to(handlers::update_user))
             .route("/users/{id}", web::delete().to(handlers::delete_user))
-            .route("/users/{id}/watchlist", web::post().to(handlers::add_wallet_to_watchlist))
-            .route("/users/{id}/watchlist", web::get().to(handlers::get_watchlist))
-            .route("/users/{id}/watchlist", web::delete().to(handlers::remove_wallet_from_watchlist))
+            .route(
+                "/users/{id}/watchlist",
+                web::post().to(handlers::add_wallet_to_watchlist),
+            )
+            .route(
+                "/users/{id}/watchlist",
+                web::get().to(handlers::get_watchlist),
+            )
+            .route(
+                "/users/{id}/watchlist",
+                web::delete().to(handlers::remove_wallet_from_watchlist),
+            )
     })
     .bind("127.0.0.1:8080")?
     .run()
     .await
 }
-

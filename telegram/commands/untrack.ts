@@ -10,7 +10,7 @@ export const untrack: Command = {
       return;
     }
     try {
-      await apiClient.delete(`/users/${msg.from!.id}/watchlist`, { data: JSON.stringify(wallet) });
+      await apiClient('DELETE',`/users/${msg.from!.id}/watchlist`, { data: JSON.stringify(wallet) });
       await sendMessage(msg.chat.id, `Successfully removed ${wallet} from your watchlist.`);
     } catch (error) {
       console.error('Error removing wallet from watchlist:', error);

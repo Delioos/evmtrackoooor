@@ -7,15 +7,16 @@ import { adminId } from '../config';
 export const requestAccess: Command = {
 	//@ts-ignore
   executeWithMiddleware: async (msg, whitelistMiddleware: WhitelistMiddleware) => {
-	console.log("Request access");
+	console.log("meow meow Request access");
 	console.log("msg content: ", msg);
     const userId = msg.from!.id;
-    const username = msg.from!.username || 'Unknown';
+    const username = msg.from!.username!;
     if (whitelistMiddleware.isWhitelisted(userId)) {
       await sendMessage(msg.chat.id, "You already have access to this bot.");
     } else if (whitelistMiddleware.isPending(userId)) {
       await sendMessage(msg.chat.id, "Your access request is pending approval.");
     } else {
+	console.log("add pending request key value", userId, username);
       whitelistMiddleware.addPendingRequest(userId, username);
       await sendMessage(msg.chat.id, "Your access request has been submitted. Please wait for approval.");
 

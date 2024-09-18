@@ -1,11 +1,19 @@
-use std::{collections::HashMap, str::FromStr};
-use tokio::sync::RwLock;
-use std::sync::Arc;
 use alloy::primitives::Address;
+use std::sync::Arc;
+use std::{collections::HashMap, str::FromStr};
+use thiserror::Error;
+use tokio::sync::RwLock;
+use tracing::{debug, error, info};
+
+#[derive(Error, Debug)]
+pub enum SubscriberError {
+    #[error("Invalid address format: {0}")]
+    InvalidAddress(String),
+}
 
 #[derive(Clone)]
 pub struct SubscribeManager {
-    subscriptions: Arc<RwLock<HashMap<Address, Vec<i32>>>>,
+    subscriptions: Arc<RwLock<HashMap<Address, Vec<u64>>>>,
 }
 
 impl SubscribeManager {
@@ -15,20 +23,30 @@ impl SubscribeManager {
         }
     }
 
-    pub async fn add_subscriber(&self, address: &str, user_id: i32) {
-        println!("add_subscriber from subscribe_manager");
-        let mut subscriptions = self.subscriptions.write().await;
-        // TODO: enhance error handling
-        let onchain_addy = Address::from_str(address).unwrap();
-        subscriptions.entry(onchain_addy)
-            .or_insert_with(Vec::new)
-            .push(user_id);
+    pub async fn add_subscriber(&self, address: &str, user_id: u64) -> Result<(), SubscriberError> {
+        info!("Adding subscriber for address: {}", address);
+        let onchain_addy = Address::from_str(address)
+            .map_err(|_| SubscriberError::InvalidAddress(address.to_string()))?;
 
-        println!("add_subscriber done {}", subscriptions.len());
-        println!("new subscribers {:?}", subscriptions);
+        let mut subscriptions = self.subscriptions.write().await;
+        let subscribers = subscriptions.entry(onchain_addy).or_insert_with(Vec::new);
+
+        if !subscribers.contains(&user_id) {
+            subscribers.push(user_id);
+            debug!("Added subscriber {} for address {}", user_id, address);
+        } else {
+            debug!(
+                "Subscriber {} already exists for address {}",
+                user_id, address
+            );
+        }
+
+        info!("Total subscriptions: {}", subscriptions.len());
+        debug!("Current subscribers: {:?}", subscriptions);
+        Ok(())
     }
 
-    pub async fn remove_subscriber(&self, address: &str, user_id: i32) {
+    pub async fn remove_subscriber(&self, address: &str, user_id: u64) {
         println!("remove_subscriber from subscribe_manager");
         let mut subscriptions = self.subscriptions.write().await;
         let onchain_addy = Address::from_str(address).unwrap();
@@ -40,8 +58,8 @@ impl SubscribeManager {
         }
     }
 
-    // Methode denormalisee qui a pour vocation de servir de read efficace lors du parcours de tx 
-    pub async fn get_subscribers(&self, address: Address) -> Option<Vec<i32>> {
+    // Methode denormalisee qui a pour vocation de servir de read efficace lors du parcours de tx
+    pub async fn get_subscribers(&self, address: Address) -> Option<Vec<u64>> {
         let subscriptions = self.subscriptions.read().await;
         subscriptions.get(&address).cloned()
     }
