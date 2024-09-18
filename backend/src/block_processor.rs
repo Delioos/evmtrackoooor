@@ -1,14 +1,14 @@
+use crate::log_decoder::LogDecoder;
 use crate::notificatooor::Notificator;
 use crate::subscribe_manager::SubscribeManager;
-use alloy::primitives::{hex, Address};
+use alloy::primitives::Address;
 use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
 use alloy::rpc::types::BlockNumberOrTag;
 use alloy::sol;
-use alloy::sol_types::SolCall;
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
+use tracing::{debug, error, trace};
 
-// TODO: separate in another file?
 sol!(
 #[allow(missing_docs)]
 function swapExactTokensForTokens(
@@ -24,6 +24,7 @@ pub struct BlockProcessor {
     provider: ReqwestProvider,
     subscribe_manager: Arc<SubscribeManager>,
     notificator: Arc<Notificator>,
+    // decoder: LogDecoder,
 }
 
 impl BlockProcessor {
@@ -34,11 +35,13 @@ impl BlockProcessor {
     ) -> Self {
         let provider =
             ProviderBuilder::default().on_http(rpc_url.parse().expect("Invalid RPC URL"));
+        // let decoder = LogDecoder::new();
 
         Self {
             provider,
             subscribe_manager,
             notificator,
+            // decoder,
         }
     }
 
@@ -68,54 +71,25 @@ impl BlockProcessor {
             .await
         {
             Ok(Some(block)) => {
-                for tx in block.transactions.into_transactions() {
-                    if let Some(from) = Option::from(tx.from) {
-                        let from_address = Address::from(from);
+                // TODO: implement the decoder
+                match decoder.decode_block(&block) {
+                    Ok(Some(wallet_movements)) => {
+                        // dispatch notifications
+                    }
 
-                        // Attempt to decode the transaction as a swapExactTokensForTokens call
-                        if let Some(to) = tx.to {
-                            let input = tx.input;
-                            if let Ok(decoded) =
-                                swapExactTokensForTokensCall::abi_decode(&input, false)
-                            {
-                                // Successfully decoded the swap
-                                let message = format!(
-                                    "Swap detected from {} in block {}:\n\
-                                     Amount In: {}\n\
-                                     Amount Out Min: {}\n\
-                                     Path: {:?}\n\
-                                     To: {}\n\
-                                     Deadline: {}",
-                                    from_address,
-                                    block_number,
-                                    decoded.amountIn,
-                                    decoded.amountOutMin,
-                                    decoded.path,
-                                    decoded.to,
-                                    decoded.deadline
-                                );
+                    Ok(None) => {
+                        trace!(
+                            "No tracked wallet interactions in the Block: {}",
+                            block_number
+                        )
+                    }
 
-                                if let Some(subscribers) =
-                                    self.subscribe_manager.get_subscribers(from).await
-                                {
-                                    for subscriber in subscribers {
-                                        println!("Sending notification to {}", subscriber);
-                                        self.notificator.send_notification(
-                                            crate::notificatooor::Notification::new(
-                                                subscriber as i64,
-                                                message.clone(),
-                                            ),
-                                        );
-                                    }
-                                }
-                            } else {
-                                // Not a swapExactTokensForTokens call, or decoding failed
-                                // println!("Transaction is not a swapExactTokensForTokens call or decoding failed");
-                            }
-                        }
+                    Err(e) => {
+                        error!("meow meow")
                     }
                 }
             }
+
             Ok(None) => {
                 eprintln!("Block {} not found", block_number);
             }
