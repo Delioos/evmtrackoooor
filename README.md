@@ -1,3 +1,4 @@
+rust based wallet tracker with a telegram client interface
 # disclaimer
 
 This is a proof of concept and should not be used in production.
