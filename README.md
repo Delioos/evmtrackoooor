@@ -18,7 +18,7 @@ cargo build
 cargo run
 ```
 
-## tegelram client  
+## telegram client  
 
 ```
 cd frontend
